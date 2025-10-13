@@ -56,7 +56,7 @@ def process_pdf(pdf_path, output_dir):
             img_bytes = base_image["image"]
             img_ext = base_image["ext"]
 
-            img_filename = f"{pdf_name}_page{page_number}_img{img_idx}.{img_ext}"
+            img_filename = f"input_{pdf_name}_page{page_number}_img{img_idx}.{img_ext}"
             img_path = os.path.join(output_dir, img_filename)
             with open(img_path, "wb") as f:
                 f.write(img_bytes)

@@ -73,7 +73,8 @@ def segment_and_save_objects(image_path: str, sam_model, output_dir: str):
         cropped_obj = masked_img[y_min:y_max, x_min:x_max]
 
         # Output filename
-        base_name_out = base_name.replace("input", "output")
+        #base_name_out = base_name.replace("input", "output")
+        base_name_out = base_name.replace("input_", "")
         output_path = os.path.join(output_dir, f"{base_name_out}_object_{i + 1:03d}.png")
         cv2.imwrite(output_path, cv2.cvtColor(cropped_obj, cv2.COLOR_RGB2BGR))
         print(f"   💾 Saved {output_path}")
@@ -93,7 +94,7 @@ def process_folder(
     input_files = get_input_files(input_folder)
 
     # Ensure output directory exists
-    create_output_dir(output_dir)
+    #create_output_dir(output_dir)
 
     # Process each file
     for image_path in input_files:

@@ -14,11 +14,9 @@ import spacy
 from find_best_paragraphs import find_best_paragraphs,save_results,load_json,print_results
 from aggregate_most_fre_para import find_most_frequent_paragraphs
 from highlight_para import highlight_paragraphs
+from object_extract import process_folder
 
 nlp = spacy.load("en_core_web_sm")
-
-
-
 
 # Download stopwords (only first time)
 nltk.download("stopwords")
@@ -216,7 +214,8 @@ def main():
             pdf_path = os.path.join(image_dir, pdf_file)
             process_pdf(pdf_path, output_dir)
     # find all objects present in the images
-    #process_folder(input_folder=image_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
+    process_folder(input_folder=output_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
+    exit(1)
 
     # read the json files
     json_path = os.path.join(output_dir, f"{prefix}.json")
@@ -285,50 +284,6 @@ def main():
         json_path=final_summary_json,
         output_path=output_dir + "outlined_output_" + prefix + ".pdf"
     )
-
-
-
-    """
-    best_similarities_json = all_similarities_json.replace("similarities", "similarities_best")
-    final_summary_json = all_similarities_json.replace("similarities", "similarities_final")
-
-    # Step 1: Find best matches per image
-    best_matches = find_best_similarities(all_similarities_json, best_similarities_json)
-
-    # Step 2: Print summary of best matches
-    for r in best_matches:
-        print(f"Main Image: {r['main_image']}")
-        print(f"  Image: {r['image']}")
-        print(f"  Best Match: Page {r['best_page']}, Paragraph {r['best_paragraph']}")
-        print(f"  Similarity: {r['best_similarity']:.3f}")
-        print(f"  Text: {r['original_text']}\n")
-
-    # Step 3: Find most frequent page/paragraph and save results (with paragraph text)
-    results = find_most_frequent_page_paragraph(best_similarities_json, final_summary_json)
-
-    # Step 4: Print results
-    for r in results:
-        print(f"Main Image: {r['main_image']}")
-        print(f"  Most Frequent Page: {r['most_frequent_page']}")
-        print(f"  Most Frequent Paragraph: {r['most_frequent_paragraph']}")
-        print(f"  Occurrences: {r['frequency']}")
-        print(f"  Paragraph Text: {r['paragraph_text']}\n")
-
-    print(f"\n✅ All results saved to: {all_similarities_json}")
-
-    best_similarities_json= all_similarities_json.replace("similarities","similarities_best")
-    best_matches = find_best_similarities(all_similarities_json, best_similarities_json)
-
-    # Print summary
-    for r in best_matches:
-        print(f"Main Image: {r['main_image']}")
-        print(f"  Image: {r['image']}")
-        print(f"  Best Match: Page {r['best_page']}, Paragraph {r['best_paragraph']}")
-        print(f"  Similarity: {r['best_similarity']:.3f}")
-        print(f"  Text: {r['original_text']}\n")
-    """
-
-
 
 
 if __name__ == "__main__":
