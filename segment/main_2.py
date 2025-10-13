@@ -15,6 +15,7 @@ from find_best_paragraphs import find_best_paragraphs,save_results,load_json,pri
 from aggregate_most_fre_para import find_most_frequent_paragraphs
 from highlight_para import highlight_paragraphs
 from object_extract import process_folder
+from fileUtils import find_images,find_subimages_for_images
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -119,7 +120,7 @@ def find_images_for_book_page(folder_path: str, book_id: str, page_number: int) 
 
     return matching_files
 
-def process_images_and_paragraphs(segment_dir, image_files, paragraphs, model, preprocess, device, output_dir,page_num,book):
+def process_images_and_paragraphs(main_img, sub_imgs, segment_dir,paragraphs, model, preprocess, device, output_dir,page_num,book):
     """Compute image ↔ paragraph similarities and save all results to one JSON file."""
 
     # Unpack cleaned texts for CLIP
@@ -130,8 +131,50 @@ def process_images_and_paragraphs(segment_dir, image_files, paragraphs, model, p
         text_features = model.encode_text(tokenized_texts)
         text_features /= text_features.norm(dim=-1, keepdim=True)
 
+    global_results = []  # 🧩 collect ALL results here
     all_results = []  # 🧩 store all image results
 
+    # Print results
+    for fileName in sub_imgs:
+        print(f"\n📷 Processing Image: {fileName}")
+        file_path = os.path.join(segment_dir, fileName)
+        image = preprocess(Image.open(file_path)).unsqueeze(0).to(device)
+        with torch.no_grad():
+            image_features = model.encode_image(image)
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            sims = (image_features @ text_features.T).squeeze(0).cpu().numpy()
+
+        # Attach metadata: (page, para_index, original_text, cleaned_text, similarity)
+        ranked = sorted(
+            [(para[0], para[1], para[2], para[3], float(sims[i])) for i, para in enumerate(paragraphs)],
+            key=lambda x: x[4],
+            reverse=True
+        )
+
+        # Print top-5
+        for page, para_index, orig_text, cleaned_text, score in ranked[:5]:
+            print(f"\n--- Page {page}, Paragraph {para_index} ---")
+            print(f"Similarity: {score:.4f}")
+            print(f"Paragraph: {orig_text}\n")
+
+        # Store all results
+        all_results.append({
+            "Image": fileName,
+            "Ranked Paragraphs": [
+                {
+                    "Page": int(page),
+                    "Paragraph": int(para_index),
+                    "Original Text": str(orig_text),
+                    "Cleaned Text": str(cleaned_text),
+                    "Similarity": float(score)
+                }
+                for page, para_index, orig_text, cleaned_text, score in ranked
+            ]
+        })
+
+    return all_results
+
+"""
     for fileName in image_files:
         print(f"\n📷 Processing Image: {fileName}")
         file_path = os.path.join(segment_dir, fileName)
@@ -178,7 +221,7 @@ def process_images_and_paragraphs(segment_dir, image_files, paragraphs, model, p
     #    json.dump(all_results, json_file, ensure_ascii=False, indent=4)
 
     #print(f"\n✅ All results saved to: {outputfile_json}")
-
+"""
 # ------------------------------
 # Example usage
 # ------------------------------
@@ -214,8 +257,7 @@ def main():
             pdf_path = os.path.join(image_dir, pdf_file)
             process_pdf(pdf_path, output_dir)
     # find all objects present in the images
-    process_folder(input_folder=output_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
-    exit(1)
+    #process_folder(input_folder=output_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
 
     # read the json files
     json_path = os.path.join(output_dir, f"{prefix}.json")
@@ -233,13 +275,13 @@ def main():
     for page_number, paras in paragraphs_by_page.items():
         print(f"--- Page {page_number} ---")
         # Use page_num to find image files
-        image_files = find_images_for_book_page(segment_dir, book, page_number)
-        print(f"Images for {book} page {page_number}:")
-
+        #image_files = find_images_for_book_page(segment_dir, book, page_number)
+        #print(f"Images for {book} page {page_number}:")
+        #print(image_files)
         # If no images are found, skip this page
-        if not image_files:
-            print(f"⚠️ No images found for {book} page {page_number}, skipping...")
-            continue
+        #if not image_files:
+        #    print(f"⚠️ No images found for {book} page {page_number}, skipping...")
+        #    continue
         for para_index, para in enumerate(paras, start=1):
             text = para["text"]  # extract string from dict
             cleaned = clean_text(text)  # now safe
@@ -248,11 +290,21 @@ def main():
             print(str(cleaned))
             print(f"[{page_number}] {cleaned}")
         print(f"✅ Loaded {len(paragraphs)} cleaned paragraphs")
-        page_results = process_images_and_paragraphs(segment_dir, image_files, paragraphs, model, preprocess, device,
+
+    # Find main images
+    main_images = find_images(output_dir, book)
+
+    # Find subimages corresponding to each main image
+    image_to_subimages = find_subimages_for_images(main_images, segment_dir)
+
+    # Print results
+    for main_img, sub_imgs in image_to_subimages.items():
+        print(f"\nMain image: {os.path.basename(main_img)}")
+        all_results = process_images_and_paragraphs(main_img, sub_imgs,segment_dir,paragraphs, model, preprocess, device,
                                                      output_dir, page_number, book)
         global_results.append({
-            "main_image": f"{book}_page{page_number}",
-            "Images": page_results
+            "main_image": main_img,
+            "Images": all_results
         })
 
     # 📝 Write everything to ONE big JSON file
