@@ -9,13 +9,15 @@ import os
 import re
 from typing import List
 from find_result import find_best_similarities,find_most_frequent_page_paragraph
-from extract_pdf_2 import process_pdf,print_all_pages,read_paragraphs_from_json
+from extract_pdf_2 import process_pdf,print_all_pages,read_paragraphs_from_json,read_images_from_json
 import spacy
 from find_best_paragraphs import find_best_paragraphs,save_results,load_json,print_results
 from aggregate_most_fre_para import find_most_frequent_paragraphs
-from highlight_para import highlight_paragraphs
+from highlight_para_1 import highlight_paragraphs
 from object_extract import process_folder
 from fileUtils import find_images,find_subimages_for_images
+from paragraph import is_valid_paragraph
+from marge_json import  add_rects_to_image_json
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -252,10 +254,12 @@ def main():
     # form a pdf file extract text and images.
     os.makedirs(output_dir, exist_ok=True)
 
-    for pdf_file in os.listdir(image_dir):
-        if pdf_file.lower().endswith(".pdf"):
-            pdf_path = os.path.join(image_dir, pdf_file)
-            process_pdf(pdf_path, output_dir)
+
+    pdf_path = os.path.join(image_dir, pdf_file)
+    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    output_pdf = os.path.join(output_dir, f"marked_{pdf_name}.pdf")
+    output_json = os.path.join(output_dir, f"{pdf_name}.json")
+    process_pdf(pdf_path, output_dir,output_pdf,output_json)
     # find all objects present in the images
     #process_folder(input_folder=output_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
 
@@ -272,25 +276,19 @@ def main():
 
     paragraphs_by_page = read_paragraphs_from_json(json_path)
 
+    index=1
     for page_number, paras in paragraphs_by_page.items():
         print(f"--- Page {page_number} ---")
-        # Use page_num to find image files
-        #image_files = find_images_for_book_page(segment_dir, book, page_number)
-        #print(f"Images for {book} page {page_number}:")
-        #print(image_files)
-        # If no images are found, skip this page
-        #if not image_files:
-        #    print(f"⚠️ No images found for {book} page {page_number}, skipping...")
-        #    continue
         for para_index, para in enumerate(paras, start=1):
             text = para["text"]  # extract string from dict
+            if not (is_valid_paragraph(text)):
+                continue
             cleaned = clean_text(text)  # now safe
             paragraphs.append((page_number, para_index, para, cleaned))
-            print(str(page_number) + " " + str(para_index) + " ")
-            print(str(cleaned))
-            print(f"[{page_number}] {cleaned}")
-        print(f"✅ Loaded {len(paragraphs)} cleaned paragraphs")
+            print(text)
+            index=index+1
 
+    print(f"✅ Loaded {len(paragraphs)} cleaned paragraphs "+str(index))
     # Find main images
     main_images = find_images(output_dir, book)
 
@@ -306,6 +304,7 @@ def main():
             "main_image": main_img,
             "Images": all_results
         })
+
 
     # 📝 Write everything to ONE big JSON file
     all_similarities_json = os.path.join(output_dir, f"{book}_all_image_objects_similarities.json")
@@ -336,6 +335,10 @@ def main():
         json_path=final_summary_json,
         output_path=output_dir + "outlined_output_" + prefix + ".pdf"
     )
+
+    final_output_json = final_summary_json.replace("similarities", "similarities_image")
+
+    add_rects_to_image_json(final_summary_json, output_json, final_output_json)
 
 
 if __name__ == "__main__":
