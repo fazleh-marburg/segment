@@ -4,7 +4,6 @@ import os
 from typing import Dict, List
 
 
-
 def get_paragraphs_from_page(page):
     """
     Extract all paragraphs (text blocks) from a PDF page.
@@ -26,29 +25,27 @@ def get_paragraphs_from_page(page):
     return paragraphs
 
 
-def process_pdf(pdf_path, output_dir,output_pdf,output_json):
+def process_pdf(pdf_path, output_dir):
     """
-    Process a single PDF:
-    - Draw red borders around images (IMG1, IMG2, ...)
-    - Draw blue boxes and number paragraphs [1], [2], ...
-    - Keep paragraph numbers synchronized in PDF and JSON
-    - Save marked PDF and JSON file
+    Process a PDF:
+    - Extract and mark images and paragraphs
+    - Save output JSON with their coordinates
     """
     os.makedirs(output_dir, exist_ok=True)
-
     pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
-    #output_pdf = os.path.join(output_dir, f"marked_{pdf_name}.pdf")
-    #output_json = os.path.join(output_dir, f"{pdf_name}.json")
+
+    output_pdf = os.path.join(output_dir, f"marked_{pdf_name}.pdf")
+    output_json = os.path.join(output_dir, f"{pdf_name}.json")
 
     doc = fitz.open(pdf_path)
     extracts = {"images": [], "paragraphs": []}
-    global_paragraph_number = 1  # continuous numbering
+    global_paragraph_number = 1
 
     for page_index, page in enumerate(doc):
         page_number = page_index + 1
         print(f"Processing page {page_number}/{len(doc)}")
 
-        # --- Extract and mark images ---
+        # --- Extract images ---
         img_list = page.get_images(full=True)
         for img_idx, img in enumerate(img_list, start=1):
             xref = img[0]
@@ -61,27 +58,25 @@ def process_pdf(pdf_path, output_dir,output_pdf,output_json):
             with open(img_path, "wb") as f:
                 f.write(img_bytes)
 
-            rects = page.get_image_rects(xref)
-            rect_coords = []
-            for rect in rects:
+            rects = []
+            for rect in page.get_image_rects(xref):
+                rects.append([rect.x0, rect.y0, rect.x1, rect.y1])
                 page.draw_rect(rect, color=(1, 0, 0), width=1.2)
                 page.insert_text(rect.tl, f"IMG{img_idx}", fontsize=8, color=(1, 0, 0))
-                rect_coords.append([rect.x0, rect.y0, rect.x1, rect.y1])
 
             extracts["images"].append({
                 "page": page_number,
                 "number": img_idx,
                 "file": img_path,
-                "rects": rect_coords
+                "rects": rects
             })
 
-        # --- Extract and mark paragraphs ---
+        # --- Extract paragraphs ---
         paragraphs = get_paragraphs_from_page(page)
         for para in paragraphs:
             rect = fitz.Rect(para["bbox"])
             text = para["text"]
 
-            # Draw blue border and label
             page.draw_rect(rect, color=(0, 0, 1), width=0.7)
             page.insert_text(rect.tl, f"[{global_paragraph_number}]", fontsize=8, color=(0, 0, 1))
 
@@ -91,7 +86,6 @@ def process_pdf(pdf_path, output_dir,output_pdf,output_json):
                 "text": text,
                 "bbox": para["bbox"]
             })
-
             global_paragraph_number += 1
 
     # --- Save marked PDF and JSON ---
@@ -105,35 +99,10 @@ def process_pdf(pdf_path, output_dir,output_pdf,output_json):
     print(f"✅ Saved JSON: {output_json}")
 
 
-def read_paragraphs_from_json(json_path):
-    """
-    Reads all paragraphs from the JSON and groups them by page.
-    Returns a dictionary: { page_number: [list of paragraph texts] }
-    """
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    paragraphs_by_page = {}
-
-    for para in data.get("paragraphs", []):
-        page = para["page"]
-        text = para["text"]
-        paragraphs_by_page.setdefault(page, []).append(text)
-
-    return paragraphs_by_page
-
 def read_paragraphs_from_json(json_path: str) -> Dict[int, List[dict]]:
     """
-    Reads all paragraphs from a JSON file created by the PDF processing script.
-    Groups them by page and returns paragraph text + bbox.
-
-    Args:
-        json_path (str): Path to the JSON file generated after PDF processing.
-
-    Returns:
-        Dict[int, List[dict]]: A dictionary where each key is a page number,
-                               and each value is a list of paragraph dictionaries
-                               with 'text' and 'bbox'.
+    Reads all paragraphs from the JSON and groups them by page.
+    Returns { page_number: [ {text, bbox}, ... ] }
     """
     if not os.path.exists(json_path):
         raise FileNotFoundError(f"JSON file not found: {json_path}")
@@ -142,7 +111,6 @@ def read_paragraphs_from_json(json_path: str) -> Dict[int, List[dict]]:
         data = json.load(f)
 
     paragraphs_by_page = {}
-
     for para in data.get("paragraphs", []):
         page = para["page"]
         text = para["text"].strip()
@@ -151,56 +119,8 @@ def read_paragraphs_from_json(json_path: str) -> Dict[int, List[dict]]:
             "text": text,
             "bbox": bbox
         })
-
     return paragraphs_by_page
 
-
-def get_paragraphs_by_page(json_path: str, page_number: int) -> List[dict]:
-    """
-    Returns all paragraphs for a specific page number from the JSON file.
-
-    Args:
-        json_path (str): Path to the JSON file.
-        page_number (int): Page number to extract paragraphs from.
-
-    Returns:
-        List[dict]: List of paragraph dictionaries containing 'text' and 'bbox'.
-    """
-    paragraphs_by_page = read_paragraphs_from_json(json_path)
-    return paragraphs_by_page.get(page_number, [])
-
-
-def get_total_pages(json_path: str) -> int:
-    """
-    Finds the total number of pages in the JSON file.
-
-    Args:
-        json_path (str): Path to the JSON file.
-
-    Returns:
-        int: Total number of pages found in the JSON.
-    """
-    paragraphs_by_page = read_paragraphs_from_json(json_path)
-    return len(paragraphs_by_page)
-
-
-def print_all_pages(json_path: str):
-    """
-    Iterates through all pages and prints all paragraphs page by page.
-    """
-    paragraphs_by_page = read_paragraphs_from_json(json_path)
-    total_pages = len(paragraphs_by_page)
-
-    print(f"\n📘 Total pages found: {total_pages}\n")
-
-    for page_number in sorted(paragraphs_by_page.keys()):
-        print(f"--- 🧾 Page {page_number} ---")
-        paragraphs = paragraphs_by_page[page_number]
-        for i, para in enumerate(paragraphs, start=1):
-            text = para["text"].replace("\n", " ")
-            preview = text[:200] + ("..." if len(text) > 200 else "")
-            print(f"[{i}] {preview}")
-        print()  # blank line between pages
 
 def read_images_from_json(json_path: str) -> Dict[int, List[dict]]:
     """
@@ -229,7 +149,6 @@ def read_images_from_json(json_path: str) -> Dict[int, List[dict]]:
     return images_by_page
 
 
-
 def print_image_rects(json_path: str):
     """
     Print all image rectangles from JSON file, grouped by page.
@@ -244,30 +163,46 @@ def print_image_rects(json_path: str):
                 print(f"  rect: {rect}")
         print()
 
+
+def print_all_pages(json_path: str):
+    """
+    Print all paragraphs grouped by page.
+    """
+    paragraphs_by_page = read_paragraphs_from_json(json_path)
+    total_pages = len(paragraphs_by_page)
+
+    print(f"\n📘 Total pages found: {total_pages}\n")
+
+    for page_number in sorted(paragraphs_by_page.keys()):
+        print(f"--- 🧾 Page {page_number} ---")
+        paragraphs = paragraphs_by_page[page_number]
+        for i, para in enumerate(paragraphs, start=1):
+            text = para["text"].replace("\n", " ")
+            preview = text[:200] + ("..." if len(text) > 200 else "")
+            print(f"[{i}] {preview}")
+        print()
+
+
 def main():
-    pdf_dir = "/home/melahi/code/image/segment/documents/input/"
-    output_dir = "/home/melahi/code/image/segment/documents/output/"
+    pdf_dir = "/documents/input/"
+    output_dir = "/documents/output/"
     os.makedirs(output_dir, exist_ok=True)
 
+    # Process all PDFs
     for pdf_file in os.listdir(pdf_dir):
         if pdf_file.lower().endswith(".pdf"):
             pdf_path = os.path.join(pdf_dir, pdf_file)
             process_pdf(pdf_path, output_dir)
 
-    """
-        Main function:
-        - Reads JSON file
-        - Prints total pages
-        - Iterates through all pages and prints all paragraphs
-        """
-    # 👇 Change this path to your JSON file
-    json_path = "/home/melahi/code/image/segment/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
+    # Example JSON path
+    json_path = "/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
 
     if not os.path.exists(json_path):
         print(f"❌ JSON file not found: {json_path}")
         return
 
     print_all_pages(json_path)
+    print_image_rects(json_path)
 
 
 if __name__ == "__main__":

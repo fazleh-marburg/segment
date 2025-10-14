@@ -57,7 +57,7 @@ def extract_paragraphs_with_bbox(pdf_dir):
 
 
 def main():
-    pdf_dir = "/home/melahi/code/image/segment/documents/input/"
+    pdf_dir = "/documents/input/"
     extract_paragraphs_with_bbox(pdf_dir)
 
 

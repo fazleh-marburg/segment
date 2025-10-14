@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # Example usage
     pdf_file = "book_Bruggen_Israels_Machtelt_Piero_del.pdf"
     prefix = pdf_file.replace(".pdf", "")
-    base_dir = "/home/melahi/code/image/segment/documents/"
+    base_dir = "/documents/"
     input_dir=base_dir+"input/"
     output_dir = base_dir + "output/"
 

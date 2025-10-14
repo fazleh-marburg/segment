@@ -191,7 +191,7 @@ def main():
 
     pdf_file = "book_Bruggen_Israels_Machtelt_Piero_del.pdf"
     prefix = pdf_file.replace(".pdf", "")
-    dir = "/home/melahi/code/image/segment/documents/"
+    dir = "/documents/"
     image_dir =  dir+"input/"
     segment_dir=dir + "segmented_objects/"
     output_dir = dir+ "output/"

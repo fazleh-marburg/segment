@@ -8,16 +8,16 @@ from typing import Dict, Tuple
 import os
 import re
 from typing import List
-from find_result import find_best_similarities,find_most_frequent_page_paragraph
-from extract_pdf_2 import process_pdf,print_all_pages,read_paragraphs_from_json,read_images_from_json
+from extract_pdf import process_pdf, read_paragraphs_from_json
 import spacy
 from find_best_paragraphs import find_best_paragraphs,save_results,load_json,print_results
 from aggregate_most_fre_para import find_most_frequent_paragraphs
-from highlight_para_1 import highlight_paragraphs
-from object_extract import process_folder
+from arch.highlight_para_1 import highlight_paragraphs
 from fileUtils import find_images,find_subimages_for_images
 from paragraph import is_valid_paragraph
 from marge_json import  add_rects_to_image_json
+import os
+from PyPDF2 import PdfReader
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -224,44 +224,12 @@ def process_images_and_paragraphs(main_img, sub_imgs, segment_dir,paragraphs, mo
 
     #print(f"\n✅ All results saved to: {outputfile_json}")
 """
-# ------------------------------
-# Example usage
-# ------------------------------
-if __name__ == "__main__":
-    folder = "/home/melahi/code/image/segment/documents/segmented_objects/"
-    book = "book_Bruggen_Israels_Machtelt_Piero_del"
-    page = 2  # Page number to find
-
-    images = find_images_for_book_page(folder, book, page)
-    print(f"Images for {book} page {page}:")
-    for img in images:
-        print(" ", img)
 
 
-def main():
+
+def main(segment_dir,output_dir,prefix,paragraph_json):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, preprocess = load_clip_model(device)
-
-
-    pdf_file = "book_Bruggen_Israels_Machtelt_Piero_del.pdf"
-    prefix = pdf_file.replace(".pdf", "")
-    dir = "/home/melahi/code/image/segment/documents/"
-    image_dir =  dir+"input/"
-    segment_dir=dir + "segmented_objects/"
-    output_dir = dir+ "output/"
-    os.makedirs(output_dir, exist_ok=True)
-
-    # form a pdf file extract text and images.
-    os.makedirs(output_dir, exist_ok=True)
-
-
-    pdf_path = os.path.join(image_dir, pdf_file)
-    pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
-    output_pdf = os.path.join(output_dir, f"marked_{pdf_name}.pdf")
-    output_json = os.path.join(output_dir, f"{pdf_name}.json")
-    process_pdf(pdf_path, output_dir,output_pdf,output_json)
-    # find all objects present in the images
-    #process_folder(input_folder=output_dir,output_dir=segment_dir,checkpoint_path=dir + "models/sam_vit_h_4b8939.pth",model_type="vit_h")
 
     # read the json files
     json_path = os.path.join(output_dir, f"{prefix}.json")
@@ -290,7 +258,7 @@ def main():
 
     print(f"✅ Loaded {len(paragraphs)} cleaned paragraphs "+str(index))
     # Find main images
-    main_images = find_images(output_dir, book)
+    main_images = find_images(output_dir, prefix)
 
     # Find subimages corresponding to each main image
     image_to_subimages = find_subimages_for_images(main_images, segment_dir)
@@ -299,19 +267,21 @@ def main():
     for main_img, sub_imgs in image_to_subimages.items():
         print(f"\nMain image: {os.path.basename(main_img)}")
         all_results = process_images_and_paragraphs(main_img, sub_imgs,segment_dir,paragraphs, model, preprocess, device,
-                                                     output_dir, page_number, book)
+                                                     output_dir, page_number, prefix)
         global_results.append({
             "main_image": main_img,
             "Images": all_results
         })
+    return global_results
 
+def find_best(global_results, output_dir, prefix, paragraph_json):
 
     # 📝 Write everything to ONE big JSON file
-    all_similarities_json = os.path.join(output_dir, f"{book}_all_image_objects_similarities.json")
+    all_similarities_json = os.path.join(output_dir, f"{prefix}_all_image_objects_similarities.json")
     with open(all_similarities_json, "w", encoding="utf-8") as json_file:
         json.dump(global_results, json_file, ensure_ascii=False, indent=4)
 
-    all_similarities_json = os.path.join(output_dir, f"{book}_all_image_objects_similarities.json")
+    all_similarities_json = os.path.join(output_dir, f"{prefix}_all_image_objects_similarities.json")
     best_similarities_json = all_similarities_json.replace("similarities", "similarities_best")
 
     data = load_json(all_similarities_json)
@@ -324,22 +294,42 @@ def main():
 
     final_summary_json = all_similarities_json.replace("similarities", "similarities_final")
 
-
     data = load_json(best_similarities_json)
     results = find_most_frequent_paragraphs(data)
     save_results(results, final_summary_json)
     print(f"✅ Results saved to {final_summary_json}")
     # Example usage
     highlight_paragraphs(
-        pdf_path=image_dir + prefix + ".pdf",
+        pdf_path=output_dir + "marked_book_Bruggen_Israels_Machtelt_Piero_del.pdf",
         json_path=final_summary_json,
         output_path=output_dir + "outlined_output_" + prefix + ".pdf"
     )
 
     final_output_json = final_summary_json.replace("similarities", "similarities_image")
-
-    add_rects_to_image_json(final_summary_json, output_json, final_output_json)
+    add_rects_to_image_json(final_summary_json, paragraph_json, final_output_json)
 
 
 if __name__ == "__main__":
-    main()
+    # Path to the input directory containing PDF files
+    dir = "/home/melahi/code/image/segment/documents/"
+    image_dir = dir + "input/"
+    segment_dir = dir + "segmented_objects/"
+    output_dir = dir + "output/"
+
+
+    # Loop through all files in the directory
+    for pdf_file in os.listdir(image_dir):
+        if pdf_file.lower().endswith(".pdf"):
+            #  extract image and paragraph
+            print(f"\n=== Reading: {pdf_file} ===")
+            pdf_file = "book_Bruggen_Israels_Machtelt_Piero_del.pdf"
+            prefix = pdf_file.replace(".pdf", "")
+            pdf_path = os.path.join(image_dir, pdf_file)
+            pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            marked_output_pdf = os.path.join(output_dir, f"marked_{pdf_name}.pdf")
+            paragraph_json = os.path.join(output_dir, f"{pdf_name}.json")
+            process_pdf(pdf_path, output_dir, marked_output_pdf, paragraph_json)
+            global_results=main(segment_dir, output_dir, prefix, paragraph_json)
+            find_best(global_results, output_dir, prefix, paragraph_json)
+
+    #main()
