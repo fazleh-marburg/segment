@@ -29,7 +29,7 @@ def highlight_paragraphs(pdf_path: str, json_path: str, output_path: str):
     doc = fitz.open(pdf_path)
 
     # Define outline color (bright yellow)
-    yellow = (1, 1, 0)
+    red = (1, 0, 0)
 
     for entry in data:
         page_num = entry.get("Most Frequent Page", 1) - 1  # PyMuPDF uses 0-based indexing
@@ -44,7 +44,7 @@ def highlight_paragraphs(pdf_path: str, json_path: str, output_path: str):
 
             # Add a yellow rectangular outline (no fill)
             annot = page.add_rect_annot(rect)
-            annot.set_colors(stroke=yellow, fill=None)
+            annot.set_colors(stroke=red, fill=None)
             annot.set_border(width=1.5)  # thickness of the outline
             annot.update()
 

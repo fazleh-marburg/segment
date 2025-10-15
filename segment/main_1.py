@@ -12,14 +12,13 @@ from extract_pdf import process_pdf, read_paragraphs_from_json
 import spacy
 from find_best_paragraphs import find_best_paragraphs,save_results,load_json,print_results
 from aggregate_most_fre_para import find_most_frequent_paragraphs
-from arch.highlight_para_1 import highlight_paragraphs
-from arch.highlight_image import extract_page_and_image,highlight_image
-
+from arch.highlight_para_1 import highlight_paragraphs,extract_page_and_image,highlight_image,parse_bbox
 from fileUtils import find_images,find_subimages_for_images
 from paragraph import is_valid_paragraph
 from marge_json import  add_rects_to_image_json
 import os
 from object_extract import process_folder
+import fitz  # PyMuPDF
 from PyPDF2 import PdfReader
 
 nlp = spacy.load("en_core_web_sm")
@@ -356,22 +355,43 @@ if __name__ == "__main__":
             final_summary_json = all_similarities_json.replace("similarities", "final")
             final_output_json = final_summary_json.replace("final", "final_image_text")
             output_pdf="outlined_output_" + prefix + ".pdf"
-            output_image_pdf = "outlined_output_image_" + prefix + ".pdf"
             find_best(all_similarities_json,best_similarities_json,final_summary_json,final_output_json,
                        global_results,  paragraph_json)
 
-            highlight_paragraphs(
-                pdf_path=image_dir + pdf_file,
-                json_path=final_summary_json,
-                output_path=output_dir + output_pdf
-            )
+            #highlight_paragraphs(pdf_path=image_dir + pdf_file,json_path=final_summary_json,output_path=output_dir + output_pdf)
             with open(final_output_json, "r") as f:
                 data = json.load(f)
 
             # --- Extract info ---
             for entry in data:
+                page_num = entry.get("Most Frequent Page", 1) - 1  # PyMuPDF uses 0-based indexing
+                bbox = parse_bbox(entry.get("Representative Original Text", ""))
+                rect = fitz.Rect(*bbox)
+                doc = fitz.open(pdf_path)
+                # Define outline color (red)
+                red = (1, 0, 0)
+                try:
+                    page = doc.load_page(page_num)
+
+                    # Add a red rectangular outline (no fill)
+                    annot = page.add_rect_annot(rect)
+                    annot.set_colors(stroke=red, fill=None)
+                    annot.set_border(width=1.5)  # thickness of the outline
+                    annot.update()
+
+                    print(f"✅ Outlined paragraph on Page {page_num + 1}: {entry['Representative Text'][:60]}...")
+                except Exception as e:
+                    print(f"⚠️ Could not outline Page {page_num + 1}: {e}")
+
+                # Save the output PDF
+                doc.save(output_pdf, deflate=True)
+                doc.close()
+                print(f"\n💾 Saved outlined PDF to: {output_pdf}")
+                exit(1)
                 main_image = entry["Main Image"]
                 page_number, image_number = extract_page_and_image(main_image)
                 print(f"🔹 Found: Page {page_number}, Image {image_number}")
-                highlight_image(output_dir+output_pdf, page_number, image_number, output_dir+output_image_pdf)
+
+                highlight_paragraphs(entry,page_num,rect,doc,output_pdf,red)
+                highlight_image(image_dir+pdf_file, page_number, image_number, output_pdf)
 
