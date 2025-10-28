@@ -5,7 +5,6 @@ import json
 import nltk
 from nltk.corpus import stopwords
 from typing import Dict, Tuple
-import os
 import re
 from typing import List
 from extract_pdf import process_pdf, read_paragraphs_from_json
@@ -19,7 +18,6 @@ from marge_json import  add_rects_to_image_json
 import os
 from object_extract import process_folder
 import fitz  # PyMuPDF
-from PyPDF2 import PdfReader
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -311,7 +309,7 @@ def find_best(all_similarities_json,best_similarities_json,final_summary_json,fi
 
 if __name__ == "__main__":
     # Path to the input directory containing PDF files
-    dir = "/home/melahi/code/image/segment/documents/"
+    dir = "/documents/"
     image_dir = dir + "input/"
     segment_dir = dir + "segmented_objects/"
     output_dir = dir + "output/"

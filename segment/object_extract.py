@@ -76,7 +76,14 @@ def segment_and_save_objects(image_path: str, sam_model, output_dir: str):
         #base_name_out = base_name.replace("input", "output")
         base_name_out = base_name.replace("input_", "")
         output_path = os.path.join(output_dir, f"{base_name_out}_object_{i + 1:03d}.png")
-        cv2.imwrite(output_path, cv2.cvtColor(cropped_obj, cv2.COLOR_RGB2BGR))
+        if cropped_obj is None or cropped_obj.size == 0:
+            print(f"⚠️ Skipping empty crop for {image_path}")
+            return  # or continue, depending on loop context
+
+        try:
+            cv2.imwrite(output_path, cv2.cvtColor(cropped_obj, cv2.COLOR_RGB2BGR))
+        except Exception as e:
+            print(f"⚠️ Failed to save object from {image_path}: {e}")
         print(f"   💾 Saved {output_path}")
 
 

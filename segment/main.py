@@ -5,22 +5,19 @@ import json
 import nltk
 from nltk.corpus import stopwords
 from typing import Dict, Tuple
-import os
 import re
 from typing import List
-from extract_pdf import process_pdf, read_paragraphs_from_json
 import spacy
-from find_best_paragraphs import find_best_paragraphs,save_results,load_json,print_results
-from aggregate_most_fre_para import find_most_frequent_paragraphs
+from .find_best_paragraphs import find_best_paragraphs, save_results, load_json, print_results
+from .aggregate_most_fre_para import find_most_frequent_paragraphs
 from arch.highlight_para_1 import highlight_paragraphs
 from arch.highlight_image import extract_page_and_image,highlight_image
-
-from fileUtils import find_images,find_subimages_for_images
-from paragraph import is_valid_paragraph
-from marge_json import  add_rects_to_image_json
+from .extract_pdf import process_pdf,read_paragraphs_from_json
+from .fileUtils import find_images,find_subimages_for_images
+from .paragraph import is_valid_paragraph
+from .marge_json import  add_rects_to_image_json
 import os
-from object_extract import process_folder
-from PyPDF2 import PdfReader
+from .object_extract import process_folder
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -142,8 +139,8 @@ def process_images_and_paragraphs(main_img, sub_imgs, segment_dir,paragraphs, mo
     # Print results
     for fileName in sub_imgs:
         print(f"\n📷 Processing Image: {fileName}")
-        file_path = os.path.join(segment_dir, fileName)
-        image = preprocess(Image.open(file_path)).unsqueeze(0).to(device)
+        #file_path = os.path.join(segment_dir, fileName)
+        image = preprocess(Image.open(fileName)).unsqueeze(0).to(device)
         with torch.no_grad():
             image_features = model.encode_image(image)
             image_features /= image_features.norm(dim=-1, keepdim=True)
@@ -178,55 +175,6 @@ def process_images_and_paragraphs(main_img, sub_imgs, segment_dir,paragraphs, mo
         })
 
     return all_results
-
-"""
-    for fileName in image_files:
-        print(f"\n📷 Processing Image: {fileName}")
-        file_path = os.path.join(segment_dir, fileName)
-
-        image = preprocess(Image.open(file_path)).unsqueeze(0).to(device)
-
-        with torch.no_grad():
-            image_features = model.encode_image(image)
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            sims = (image_features @ text_features.T).squeeze(0).cpu().numpy()
-
-        # Attach metadata: (page, para_index, original_text, cleaned_text, similarity)
-        ranked = sorted(
-            [(para[0], para[1], para[2], para[3], float(sims[i])) for i, para in enumerate(paragraphs)],
-            key=lambda x: x[4],
-            reverse=True
-        )
-
-        # Print top-5
-        for page, para_index, orig_text, cleaned_text, score in ranked[:5]:
-            print(f"\n--- Page {page}, Paragraph {para_index} ---")
-            print(f"Similarity: {score:.4f}")
-            print(f"Paragraph: {orig_text}\n")
-
-        # Store all results
-        all_results.append({
-            "Image": fileName,
-            "Ranked Paragraphs": [
-                {
-                    "Page": int(page),
-                    "Paragraph": int(para_index),
-                    "Original Text": str(orig_text),
-                    "Cleaned Text": str(cleaned_text),
-                    "Similarity": float(score)
-                }
-                for page, para_index, orig_text, cleaned_text, score in ranked
-            ]
-        })
-
-    return all_results
-    # 📝 Save all image results in one JSON file
-    #outputfile_json = os.path.join(output_dir, str(book)+"_"+"page"+str(page_num)+"_"+"all_images"+".json")
-    #with open(outputfile_json, "w", encoding="utf-8") as json_file:
-    #    json.dump(all_results, json_file, ensure_ascii=False, indent=4)
-
-    #print(f"\n✅ All results saved to: {outputfile_json}")
-"""
 
 
 
@@ -280,14 +228,6 @@ def main(segment_dir,output_dir,prefix,paragraph_json):
 def find_best(all_similarities_json,best_similarities_json,final_summary_json,final_output_json,
                      global_results, paragraph_json):
 
-    # 📝 Write everything to ONE big JSON file
-    #all_similarities_json = os.path.join(output_dir, f"{prefix}_similarities.json")
-    #best_similarities_json = all_similarities_json.replace("similarities", "best")
-    #final_summary_json = all_similarities_json.replace("similarities", "final")
-    #final_output_json = final_summary_json.replace("final", "final_image_text")
-
-
-
     with open(all_similarities_json, "w", encoding="utf-8") as json_file:
         json.dump(global_results, json_file, ensure_ascii=False, indent=4)
 
@@ -312,14 +252,18 @@ def find_best(all_similarities_json,best_similarities_json,final_summary_json,fi
 
 if __name__ == "__main__":
     # Path to the input directory containing PDF files
-    dir = "/home/melahi/code/image/segment/documents/"
+    dir = "documents/"
     image_dir = dir + "input/"
     segment_dir = dir + "segmented_objects/"
     output_dir = dir + "output/"
+    process_log_dir=dir+"process/"
 
     # --- Add menu option ---
-    menu = 0
+    menu = 1
 
+    # --- Step 5: Log processed PDF files ---
+    os.makedirs(process_log_dir, exist_ok=True)  # Ensure folder exists
+    processed_log_path = os.path.join(process_log_dir, "processed_pdfs.txt")
 
     # Loop through all files in the directory
     for pdf_file in os.listdir(image_dir):
@@ -346,7 +290,6 @@ if __name__ == "__main__":
                 )
             else:
                 print("\n⏭️ Skipping process_folder.")
-
             # --- Step 3: Run CLIP similarity and highlight best paragraphs ---
             global_results = main(segment_dir, output_dir, prefix, paragraph_json)
             # --- Step 4: highlight the
@@ -374,4 +317,9 @@ if __name__ == "__main__":
                 page_number, image_number = extract_page_and_image(main_image)
                 print(f"🔹 Found: Page {page_number}, Image {image_number}")
                 highlight_image(output_dir+output_pdf, page_number, image_number, output_dir+output_image_pdf)
+
+
+            with open(processed_log_path, "a", encoding="utf-8") as log_file:
+                log_file.write(f"{pdf_file}\n")
+            print(f"🗂️ Logged processed file: {pdf_file} → {processed_log_path}")
 

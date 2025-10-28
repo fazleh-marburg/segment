@@ -8,9 +8,8 @@ from typing import Dict, Tuple
 import os
 import re
 from typing import List
-from find_result import find_best_similarities,find_most_frequent_page_paragraph
-from object_extract import process_folder
-from archieve.extract_pdf import extract_images_and_text
+from segment.find_result import find_best_similarities,find_most_frequent_page_paragraph
+from archieve.extract_pdf_test import extract_images_and_text
 
 
 

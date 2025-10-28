@@ -8,6 +8,11 @@ def load_json(file_path: str) -> List[Dict[str, Any]]:
         return json.load(f)
 
 
+def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
+    """Save the best paragraph results to a JSON file."""
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=4, ensure_ascii=False)
+
 def find_best_paragraphs(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Find the best paragraph (highest similarity) for each image, considering only paragraphs with >3 words."""
     results = []
@@ -76,4 +81,8 @@ def main(input_path: str, output_path: str = None) -> None:
 
 if __name__ == "__main__":
     # Example usage
-    main("input.json", "best_paragraphs.json")
+    dir = "/documents/"
+    image_dir = dir + "input/"
+    segment_dir = dir + "segmented_objects/"
+    output_dir = dir + "output/"
+    main(output_dir+"input.json", "best_paragraphs.json")

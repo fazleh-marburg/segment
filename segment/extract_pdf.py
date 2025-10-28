@@ -245,8 +245,8 @@ def print_image_rects(json_path: str):
         print()
 
 def main():
-    pdf_dir = "/home/melahi/code/image/segment/documents/input/"
-    output_dir = "/home/melahi/code/image/segment/documents/output/"
+    pdf_dir = "/documents/input/"
+    output_dir = "/documents/output/"
     os.makedirs(output_dir, exist_ok=True)
 
     for pdf_file in os.listdir(pdf_dir):
@@ -261,7 +261,7 @@ def main():
         - Iterates through all pages and prints all paragraphs
         """
     # 👇 Change this path to your JSON file
-    json_path = "/home/melahi/code/image/segment/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
+    json_path = "/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
 
     if not os.path.exists(json_path):
         print(f"❌ JSON file not found: {json_path}")

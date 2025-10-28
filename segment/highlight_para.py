@@ -67,12 +67,12 @@ def highlight_paragraphs(pdf_path: str, json_path: str, output_path: str):
 if __name__ == "__main__":
     pdf_file = "book_Bruggen_Israels_Machtelt_Piero_del.pdf"
     prefix = pdf_file.replace(".pdf", "")
-    base_dir = "/home/melahi/code/image/segment/documents/"
+    base_dir = "/documents/"
     input_dir = base_dir + "input/"
     output_dir = base_dir + "output/"
 
     highlight_paragraphs(
-        pdf_path="/home/melahi/code/image/segment/documents/output/marked_book_Bruggen_Israels_Machtelt_Piero_del.pdf",
+        pdf_path="/documents/output/marked_book_Bruggen_Israels_Machtelt_Piero_del.pdf",
         json_path=output_dir + "book_Bruggen_Israels_Machtelt_Piero_del_all_image_objects_similarities_image_final.json",
         output_path=output_dir + "outlined_output_" + prefix + ".pdf"
     )

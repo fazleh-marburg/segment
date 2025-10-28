@@ -92,7 +92,7 @@ def main():
     - Iterates through all pages and prints all paragraphs
     """
     # 👇 Change this path to your JSON file
-    json_path = "/home/melahi/code/image/segment/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
+    json_path = "/documents/output/book_Bruggen_Israels_Machtelt_Piero_del.json"
 
     if not os.path.exists(json_path):
         print(f"❌ JSON file not found: {json_path}")
